@@ -1,4 +1,4 @@
-name: Build ${{ GITHUB_REPOSITORY }} software
+name: Build ${{ github.repository }} software
 
 on:
   push:
