@@ -25,7 +25,6 @@ jobs:
     steps:
 
     - name: Update & install required packages inside the container
-      if: matrix.sys.container != ''
       run: |
         apt update
         apt -y full-upgrade
