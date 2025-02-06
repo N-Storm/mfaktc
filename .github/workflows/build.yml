@@ -40,12 +40,12 @@ jobs:
       run: cd src && make -j$(nproc)
 
     - name: Rename binary to release target
-      if: startsWith(github.ref, 'refs/tags/[0-9]+\.[0-9]+\.[0-9]+')
+      if: startsWith(github.ref, 'refs/tags')
       run: mv ./mfaktc ./mfaktc-${{ github.ref_name }}-cuda${{ matrix.sys.cuda_version }}-${{ matrix.sys.ct_os }}
 
     - name: Make and upload release
       uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/[0-9]+\.[0-9]+\.[0-9]+')
+      if: startsWith(github.ref, 'refs/tags')
       with:
         fail_on_unmatched_files: false
         generate_release_notes: true        
