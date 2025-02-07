@@ -28,10 +28,9 @@ jobs:
           - { host_os: ubuntu-latest, cuda_version: '12.1.0', ct_os: 'ubuntu22.04' }
           - { host_os: ubuntu-latest, cuda_version: '12.0.0', ct_os: 'ubuntu22.04' }
           - { host_os: ubuntu-latest, cuda_version: '11.8.0', ct_os: 'ubuntu22.04' }
-          - { host_os: ubuntu-latest, cuda_version: '11.7.1', ct_os: 'ubuntu22.04' }
-          - { host_os: ubuntu-latest, cuda_version: '11.0.3', ct_os: 'ubuntu20.04' }
+          - { host_os: ubuntu-latest, cuda_version: '11.7.1', ct_os: 'ubuntu22.04', ccmax: 87 }
+          - { host_os: ubuntu-latest, cuda_version: '11.0.3', ct_os: 'ubuntu20.04', ccmax: 80 }
 
-  
     steps:
 
     - name: Update & install required packages inside the container
@@ -43,6 +42,22 @@ jobs:
 
     - name: Checkout repo
       uses: actions/checkout@v3
+
+    - name: Update Makefile
+      if: matrix.sys.ccmin || matrix.sys.ccmax
+      shell: bash
+      run: |
+        echo "Removing CC outside of [CCMIN=$CCMIN..CCMAX=$CCMAX] bounds"
+        for cc in $(grep -E '^NVCCFLAGS \+=.*?compute_[0-9]{2}' src/Makefile | grep -Eoe 'compute_[0-9]{2}' | tr -d '\r' | cut -d '_' -f2 | xargs); do
+          if [[ $cc -lt $CCMIN ]] || [[ $cc -gt $CCMAX ]]; then
+            echo "Removing CC $cc"
+            sed -i -E "/^NVCCFLAGS \+=.*?compute_$cc/d" src/Makefile
+          fi
+        done
+      env:
+        CCMIN: ${{ matrix.sys.ccmin || 01 }}
+        CCMAX: ${{ matrix.sys.ccmax || 90 }}
+
 
     - name: Build from sources
       run: cd src && make -j$(nproc)
@@ -56,5 +71,5 @@ jobs:
       if: startsWith(github.ref, 'refs/tags')
       with:
         fail_on_unmatched_files: false
-        generate_release_notes: true        
+        generate_release_notes: true
         files: ./mfaktc-${{ github.ref_name }}-linux64-cuda${{ matrix.sys.cuda_version }}
