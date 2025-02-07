@@ -28,6 +28,8 @@ jobs:
           - { host_os: ubuntu-latest, cuda_version: '12.1.0', ct_os: 'ubuntu22.04' }
           - { host_os: ubuntu-latest, cuda_version: '12.0.0', ct_os: 'ubuntu22.04' }
           - { host_os: ubuntu-latest, cuda_version: '11.8.0', ct_os: 'ubuntu22.04' }
+          - { host_os: ubuntu-latest, cuda_version: '11.7.1', ct_os: 'ubuntu22.04' }
+          - { host_os: ubuntu-latest, cuda_version: '11.0.3', ct_os: 'ubuntu20.04' }
 
   
     steps:
@@ -40,16 +42,14 @@ jobs:
                        libgmp-dev make clinfo patch diffutils unzip
 
     - name: Checkout repo
-      uses: actions/checkout@v4
-      with:
-        submodules: 'recursive'
+      uses: actions/checkout@v3
 
     - name: Build from sources
       run: cd src && make -j$(nproc)
 
     - name: Rename binary to release target
       if: startsWith(github.ref, 'refs/tags')
-      run: mv ./mfaktc ./mfaktc-${{ github.ref_name }}-cuda${{ matrix.sys.cuda_version }}-${{ matrix.sys.ct_os }}
+      run: mv ./mfaktc ./mfaktc-${{ github.ref_name }}-linux64-cuda${{ matrix.sys.cuda_version }}
 
     - name: Make and upload release
       uses: softprops/action-gh-release@v2
@@ -57,4 +57,4 @@ jobs:
       with:
         fail_on_unmatched_files: false
         generate_release_notes: true        
-        files: ./mfaktc-${{ github.ref_name }}-cuda${{ matrix.sys.cuda_version }}-${{ matrix.sys.ct_os }}
+        files: ./mfaktc-${{ github.ref_name }}-linux64-cuda${{ matrix.sys.cuda_version }}
