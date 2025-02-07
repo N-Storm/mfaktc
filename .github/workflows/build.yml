@@ -59,6 +59,9 @@ jobs:
             sed -i -E "/^NVCCFLAGS \+=.*?compute_$cc/d" src/Makefile
           fi
         done
+        
+        echo "Adding libraries to LDFLAGS to support static build on older Ubuntu versions..."
+        sed -i -E 's/^(LDFLAGS = .*? -lcudart_static) (.*)/\1 -ldl -lrt -lpthread \2/' src/Makefile
 
     - name: Build from sources
       run: cd src && make -j$(nproc)
