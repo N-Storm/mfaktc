@@ -61,7 +61,12 @@ jobs:
                        libgmp-dev make clinfo patch diffutils zip unzip
 
     - name: Checkout repo
+      if: matrix.sys.ct_os == 'ubuntu22.04' || matrix.sys.ct_os == 'ubuntu20.04'
       uses: actions/checkout@v3
+
+    - name: Checkout repo
+      if: matrix.sys.ct_os != 'ubuntu22.04' && matrix.sys.ct_os != 'ubuntu20.04'
+      run: git clone https://github.com/${{ github.repository }} .
 
     - name: Update Makefile
       id: update_makefile
