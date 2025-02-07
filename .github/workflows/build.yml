@@ -20,7 +20,26 @@ jobs:
       matrix:
         sys:
           - { host_os: ubuntu-latest, cuda_version: '12.8.0', ct_os: 'ubuntu24.04' }
+          - { host_os: ubuntu-latest, cuda_version: '12.8.0', ct_os: 'ubuntu22.04' }
+          - { host_os: ubuntu-latest, cuda_version: '12.8.0', ct_os: 'ubuntu20.04' }
+          - { host_os: ubuntu-latest, cuda_version: '12.6.3', ct_os: 'ubuntu24.04' }
+          - { host_os: ubuntu-latest, cuda_version: '12.6.3', ct_os: 'ubuntu22.04' }
+          - { host_os: ubuntu-latest, cuda_version: '12.6.3', ct_os: 'ubuntu20.04' }
+          - { host_os: ubuntu-latest, cuda_version: '12.5.1', ct_os: 'ubuntu22.04' }
+          - { host_os: ubuntu-latest, cuda_version: '12.5.1', ct_os: 'ubuntu20.04' }
+          - { host_os: ubuntu-latest, cuda_version: '12.4.1', ct_os: 'ubuntu22.04' }
+          - { host_os: ubuntu-latest, cuda_version: '12.4.1', ct_os: 'ubuntu20.04' }
+          - { host_os: ubuntu-latest, cuda_version: '12.3.2', ct_os: 'ubuntu22.04' }
+          - { host_os: ubuntu-latest, cuda_version: '12.3.2', ct_os: 'ubuntu20.04' }
           - { host_os: ubuntu-latest, cuda_version: '12.2.2', ct_os: 'ubuntu22.04' }
+          - { host_os: ubuntu-latest, cuda_version: '12.2.2', ct_os: 'ubuntu20.04' }
+          - { host_os: ubuntu-latest, cuda_version: '12.1.0', ct_os: 'ubuntu22.04' }
+          - { host_os: ubuntu-latest, cuda_version: '12.1.0', ct_os: 'ubuntu20.04' }
+          - { host_os: ubuntu-latest, cuda_version: '12.0.0', ct_os: 'ubuntu22.04' }
+          - { host_os: ubuntu-latest, cuda_version: '12.0.0', ct_os: 'ubuntu20.04' }
+          - { host_os: ubuntu-latest, cuda_version: '11.8.0', ct_os: 'ubuntu22.04' }
+          - { host_os: ubuntu-latest, cuda_version: '11.8.0', ct_os: 'ubuntu20.04' }
+          - { host_os: ubuntu-latest, cuda_version: '11.8.0', ct_os: 'ubuntu18.04' }
   
     steps:
 
