@@ -73,7 +73,7 @@ jobs:
 
     - name: Checkout repo
       if: matrix.sys.ct_os != 'ubuntu22.04' && matrix.sys.ct_os != 'ubuntu20.04'
-      run: git clone https://github.com/${{ github.repository }} .
+      uses: actions/checkout@v1
 
     - name: Update Makefile
       id: update_makefile
