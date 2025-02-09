@@ -53,12 +53,19 @@ jobs:
 
     steps:
 
+    - name: Fix GPG keys for NVidia repo on Ubuntu 16.04
+      if: matrix.sys.ct_os == 'ubuntu16.04'
+      run: |
+        apt update || /bin/true
+        apt install -y wget
+        wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/3bf863cc.pub
+        apt-key add 3bf863cc.pub
+
     - name: Update & install required packages inside the container
       run: |
         apt update
         apt -y full-upgrade
-        apt install -y curl dialog git python3 python3-pip python3-setuptools sudo wget build-essential nvidia-opencl-dev ocl-icd-dev libgmp10 \
-                       libgmp-dev make clinfo patch diffutils zip unzip
+        apt install -y build-essential curl git make python3 sudo unzip wget zip
 
     - name: Checkout repo
       if: matrix.sys.ct_os == 'ubuntu22.04' || matrix.sys.ct_os == 'ubuntu20.04'
