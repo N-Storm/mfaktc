@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: "nvcr.io/nvidia/cuda:${{ matrix.sys.cuda_version }}-devel-${{ matrix.sys.ct_os }}"
+    # container: "nvcr.io/nvidia/cuda:${{ matrix.sys.cuda_version }}-devel-${{ matrix.sys.ct_os }}"
 
     strategy:
       # Set fail-fast to false to ensure that feedback is delivered for all matrix combinations. Consider changing this to true when your workflow is stable.
@@ -48,78 +48,85 @@ jobs:
           - { cuda_version: '9.2', ct_os: 'ubuntu18.04' }
           - { cuda_version: '8.0', ct_os: 'ubuntu16.04' }
 
+    env:
+      CONTAINER: "nvcr.io/nvidia/cuda:${{ matrix.sys.cuda_version }}-devel-${{ matrix.sys.ct_os }}"
+    
     steps:
-    - name: Run ${{ join(matrix.*, ' - ') }} - ${{ github.event_name }}
-      run: echo "${{ join(matrix.*, ' - ') }} - ${{ github.event_name }}"
 
-    - name: Fix GPG keys for NVidia repo on Ubuntu 16.04
-      if: matrix.sys.ct_os == 'ubuntu16.04'
-      run: |
-        apt update || /bin/true
-        apt install -y wget
-        wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/3bf863cc.pub
-        apt-key add 3bf863cc.pub
+      - name: Start Docker Container
+        run: |
+          docker pull $CONTAINER
+          docker run --name build-container -d -v ${{ github.workspace }}:/workspace $CONTAINER tail -f /dev/null
 
-    - name: Update & install required packages inside the container
-      run: |
-        apt update
-        apt -y full-upgrade
-        apt install -y build-essential curl git make python3 sudo unzip wget zip
+      - name: Fix GPG keys for NVidia repo on Ubuntu 16.04
+        if: matrix.sys.ct_os == 'ubuntu16.04'
+        env:
+          SCRIPT: |
+            apt update || /bin/true
+            apt install -y wget
+            wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/3bf863cc.pub
+            apt-key add 3bf863cc.pub
+        run: docker exec build-container bash -c "$SCRIPT"
 
-    - name: Checkout repo
-      if: matrix.sys.ct_os == 'ubuntu22.04' || matrix.sys.ct_os == 'ubuntu20.04'
-      uses: actions/checkout@v3
+      - name: Update & install required packages inside the container
+        env:
+          SCRIPT: |
+            apt update
+            apt -y full-upgrade
+            apt install -y build-essential curl git make python3 sudo unzip wget zip
+        run: docker exec build-container bash -c "$SCRIPT"
 
-    - name: Checkout repo
-      if: matrix.sys.ct_os != 'ubuntu22.04' && matrix.sys.ct_os != 'ubuntu20.04'
-      uses: actions/checkout@v1
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-    - name: Update Makefile
-      id: update_makefile
-      shell: bash
-      run: |
-        echo -n "Checking for nvcc maximum supported CC... "
-        export CCMAX=$(nvcc --help | grep -Eoe "compute_[0-9]{2}" | cut -d '_' -f2 | sort -un | tail -n1)
-        echo $CCMAX
-        echo "CCMAX=$CCMAX" >> $GITHUB_OUTPUT
+      - name: Update Makefile
+        id: update_makefile
+        shell: bash
+        env:
+          SCRIPT: |
+            cd /workspace
+            echo -n "Checking for nvcc maximum supported CC... "
+            export CCMAX=$(nvcc --help | grep -Eoe "compute_[0-9]{2}" | cut -d '_' -f2 | sort -un | tail -n1)
+            echo $CCMAX
+            echo "CCMAX=$CCMAX" >> ./GITHUB_OUTPUT
 
-        echo "Removing unsupported CCs (> $CCMAX) from the Makefile"
-        for cc in $(grep -E '^NVCCFLAGS \+=.*?compute_[0-9]{2}' src/Makefile | grep -Eoe 'compute_[0-9]{2}' | tr -d '\r' | cut -d '_' -f2 | xargs); do
-          if [[ $cc -gt $CCMAX ]]; then
-            echo "Removing CC $cc"
-            sed -i -E "/^NVCCFLAGS \+=.*?compute_$cc/d" src/Makefile
-          fi
-        done
+            echo "Removing unsupported CCs (> $CCMAX) from the Makefile"
+            for cc in $(grep -E '^NVCCFLAGS \+=.*?compute_[0-9]{2}' src/Makefile | grep -Eoe 'compute_[0-9]{2}' | tr -d '\r' | cut -d '_' -f2 | xargs); do
+              if [[ $cc -gt $CCMAX ]]; then
+                echo "Removing CC $cc"
+                sed -i -E "/^NVCCFLAGS \+=.*?compute_$cc/d" src/Makefile
+              fi
+            done
 
-        echo "Adding libraries to LDFLAGS to support static build on older Ubuntu versions..."
-        sed -i -E 's/^(LDFLAGS = .*? -lcudart_static) (.*)/\1 -ldl -lrt -lpthread \2/' src/Makefile
+            echo "Adding libraries to LDFLAGS to support static build on older Ubuntu versions..."
+            sed -i -E 's/^(LDFLAGS = .*? -lcudart_static) (.*)/\1 -ldl -lrt -lpthread \2/' src/Makefile
+        run: |
+          docker exec build-container bash -c "$SCRIPT"
+          cat GITHUB_OUTPUT > $GITHUB_OUTPUT
 
-    - name: Build from sources
-      run: cd src && make -j$(nproc)
+      - name: Build from sources
+        env:
+          SCRIPT: cd /workspace/src && make -j$(nproc)
+        run: docker exec build-container bash -c "$SCRIPT"
 
-    - name: Prepare zip archive for release and build description
-      if: true || startsWith(github.ref, 'refs/tags')
-      run: |
-        export BASE_NAME="mfaktc-${{ github.ref_name }}-linux64-cuda${{ matrix.sys.cuda_version }}"
-        zip -9 -j ${BASE_NAME}.zip *
-        echo "[${BASE_NAME}.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${BASE_NAME}.zip) | \
-        ${{ steps.update_makefile.outputs.CCMAX }} | ${{ matrix.sys.ct_os }} | $(gcc --version | head -n1) | $(nvcc --version | tail -n1)" > ${BASE_NAME}.txt
+      - name: Prepare zip archive for release and build description
+        if: true || startsWith(github.ref, 'refs/tags')
+        env:
+          SCRIPT: |
+            cd /workspace
+            export BASE_NAME="mfaktc-${{ github.ref_name }}-linux64-cuda${{ matrix.sys.cuda_version }}"
+            zip -9 -j ${BASE_NAME}.zip *
+            echo "[${BASE_NAME}.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${BASE_NAME}.zip) | \
+            ${{ steps.update_makefile.outputs.CCMAX }} | ${{ matrix.sys.ct_os }} | $(gcc --version | head -n1) | $(nvcc --version | tail -n1)" > ${BASE_NAME}.txt
+        run: docker exec build-container bash -c "$SCRIPT"
 
-    - name: Upload build artifacts for release
-      if: ( true || startsWith(github.ref, 'refs/tags') ) && (matrix.sys.ct_os == 'ubuntu22.04' || matrix.sys.ct_os == 'ubuntu20.04')
-      uses: actions/upload-artifact@v4
-      with:
-        name: mfaktc-${{ github.ref_name }}-linux64-cuda${{ matrix.sys.cuda_version }}
-        path: mfaktc-${{ github.ref_name }}-linux64-cuda${{ matrix.sys.cuda_version }}.*
+      - name: Upload build artifacts for release
+        if: true || startsWith(github.ref, 'refs/tags')
+        uses: actions/upload-artifact@v4
+        with:
+          name: mfaktc-${{ github.ref_name }}-linux64-cuda${{ matrix.sys.cuda_version }}
+          path: mfaktc-${{ github.ref_name }}-linux64-cuda${{ matrix.sys.cuda_version }}.*
 
-    - name: Make and upload release
-      uses: softprops/action-gh-release@v1
-      if: ( true || startsWith(github.ref, 'refs/tags') ) && (matrix.sys.ct_os != 'ubuntu22.04' && matrix.sys.ct_os != 'ubuntu20.04')
-      with:
-        fail_on_unmatched_files: false
-        files: mfaktc-${{ github.ref_name }}-linux64-cuda${{ matrix.sys.cuda_version }}.zip
-
-          
   upload_release:
     if: true || startsWith(github.ref, 'refs/tags/')
     needs: build
@@ -130,17 +137,18 @@ jobs:
 
     steps:
 
-    - name: Download artifacts
-      uses: actions/download-artifact@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
 
-    - name: Display structure of downloaded files
-      run: ls -R
+      - name: Display structure of downloaded files
+        run: ls -R
 
-    - name: Make and upload release
-      uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        fail_on_unmatched_files: false
-        generate_release_notes: true
-        files: mfaktc-${{ github.ref_name }}-linux64-cuda${{ matrix.sys.cuda_version }}.zip
-        body: " - mfaktc-${{ github.ref_name }}-linux64-cuda${{ matrix.sys.cuda_version }}.zip: max CC ${{ steps.update_makefile.outputs.CCMAX }}, build os ${{ matrix.sys.ct_os }}"
+      - name: Make and upload release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          fail_on_unmatched_files: false
+          files: mfaktc-*.zip
+          # generate_release_notes: true
+          # files: mfaktc-${{ github.ref_name }}-linux64-cuda${{ matrix.sys.cuda_version }}.zip
+          # body: " - mfaktc-${{ github.ref_name }}-linux64-cuda${{ matrix.sys.cuda_version }}.zip: max CC ${{ steps.update_makefile.outputs.CCMAX }}, build os ${{ matrix.sys.ct_os }}"
