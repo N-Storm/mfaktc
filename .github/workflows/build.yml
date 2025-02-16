@@ -140,15 +140,20 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
 
-      - name: Display structure of downloaded files
-        run: ls -R
+      - name: Prepare list of release files & release notes
+        id: makeinfo
+        run: |
+          echo -e "Binary releases (automated builds) below. Max CC in the table means maximum supported compute capability version without dot (i.e. 90 reads as 9.0).\n" > RELEASE_NOTES.txt
+          echo "Filename | Max CC | Build OS | GCC version | NVCC version" >> RELEASE_NOTES.txt
+          echo " - | - | - | - | - " >> RELEASE_NOTES.txt
+          cat mfaktc-${{ github.ref_name }}-linux64-cuda*/ mfaktc-${{ github.ref_name }}-linux64-cuda*.txt | sort -Vr >> RELEASE_NOTES.txt
+          echo "RELEASE_FILES=\"$(ls -1 mfaktc-${{ github.ref_name }}-linux64-cuda*/mfaktc-${{ github.ref_name }}-linux64-cuda*.zip | sort -Vr | xargs )\" " > $GITHUB_OUTPUT
 
       - name: Make and upload release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.2.1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           fail_on_unmatched_files: false
-          files: mfaktc-*.zip
-          # generate_release_notes: true
-          # files: mfaktc-${{ github.ref_name }}-linux64-cuda${{ matrix.sys.cuda_version }}.zip
-          # body: " - mfaktc-${{ github.ref_name }}-linux64-cuda${{ matrix.sys.cuda_version }}.zip: max CC ${{ steps.update_makefile.outputs.CCMAX }}, build os ${{ matrix.sys.ct_os }}"
+          files: ${{ steps.makeinfo.outputs.RELEASE_FILES }}
+          generate_release_notes: true
+          body_path: RELEASE_NOTES.txt
