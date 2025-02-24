@@ -533,7 +533,6 @@ RET_CUDA_ERROR we might have a serios problem (detected by cudaGetLastError())
   {
     for(i = 0; i < testcases; i++)
     {
-
       logprintf(mystuff, "########## testcase %d/%d ##########\n", i+1, testcases);
       f_class = (int)(st_data[i].k % NUM_CLASSES);
 
@@ -977,7 +976,6 @@ int main(int argc, char **argv)
 
   if(mystuff.compcapa_major == 1) // CC 1.x
   {
-
     logprintf(&mystuff, "\n\n\nSorry, devices with compute capability 1.%d are not supported!\n", mystuff.compcapa_minor);
     if(mystuff.compcapa_minor > 0) // CC 1.1 to CC 1.3, CC 1.0 was NEVER supported by mfaktc.
     {
