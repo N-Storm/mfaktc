@@ -106,7 +106,7 @@ jobs:
             cd /workspace
             zip -9 -j ${{ env.base_name }}.zip *
             echo "[${{ env.base_name }}.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ env.base_name }}.zip) | \
-            ${{ matrix.sys.os.cuda_version }} | ${{ steps.prepare.outputs.CC_MIN }}-${{ steps.prepare.outputs.CC_MAX }} | ${{ steps.prepare.outputs.OS_VER }} | \
+            ${{ matrix.sys.cuda_version }} | ${{ steps.prepare.outputs.CC_MIN }}-${{ steps.prepare.outputs.CC_MAX }} | ${{ steps.prepare.outputs.OS_VER }} | \
             ${{ steps.prepare.outputs.COMPILER_VER }} | ${{ steps.prepare.outputs.NVCC_VER }}" > ${{ env.base_name }}.txt
         run: docker exec build-container bash -c "$SCRIPT"
 
@@ -196,7 +196,7 @@ jobs:
           choco install -y --no-progress zip
           zip -9 -j "${{ env.base_name }}.zip" *
           echo "[${{ env.base_name }}.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ env.base_name }}.zip) | \
-          ${{ matrix.sys.os.cuda_version }} | ${{ steps.prepare.outputs.CC_MIN }}-${{ steps.prepare.outputs.CC_MAX }} | ${{ steps.prepare.outputs.OS_VER }} | \
+          ${{ matrix.sys.cuda_version }} | ${{ steps.prepare.outputs.CC_MIN }}-${{ steps.prepare.outputs.CC_MAX }} | ${{ steps.prepare.outputs.OS_VER }} | \
           ${{ steps.prepare.outputs.COMPILER_VER }} | ${{ steps.prepare.outputs.NVCC_VER }}" > ${{ env.base_name }}.txt
 
       - name: Upload build artifacts
@@ -227,7 +227,7 @@ jobs:
           echo "Compute Capability (CC) in the table means minimum and maximum versions supported." >> RELEASE_NOTES.txt
           echo "CC versions are listed without the dot (i.e. 90 means 9.0 compute capability)." >> RELEASE_NOTES.txt
           echo >> RELEASE_NOTES.txt
-          echo "File | Compute Capability | CUDA version | Build OS | Compiler version | NVCC version" >> RELEASE_NOTES.txt
+          echo "File | CUDA version | Compute Capability | Build OS | Compiler version | NVCC version" >> RELEASE_NOTES.txt
           echo "--- | --- | --- | --- | --- | ---" >> RELEASE_NOTES.txt
           cat mfaktc-${{ github.ref_name }}-*-cuda*/mfaktc-${{ github.ref_name }}-*-cuda*.txt | sort -Vr >> RELEASE_NOTES.txt
           echo 'RELEASE_FILES<<EOF' > $GITHUB_OUTPUT
