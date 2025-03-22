@@ -99,16 +99,26 @@ Enough space is
 
 void print_dez96(int96 a, char *buf)
 {
-  int192 tmp;
+  char digit[FACTOR_MAX_LENGTH + 1];
+  int digits = 0, carry = 0, i = 0;
+  long long int tmp = 0;
 
-  tmp.d5 = 0;
-  tmp.d4 = 0;
-  tmp.d3 = 0;
-  tmp.d2 = a.d2;
-  tmp.d1 = a.d1;
-  tmp.d0 = a.d0;
-
-  print_dez192(tmp, buf);
+  while((a.d0!=0 || a.d1!=0 || a.d2!=0) && digits < FACTOR_MAX_LENGTH)
+  {
+                                                   carry = a.d2%10; a.d2 /= 10;
+    tmp = a.d1; tmp += (long long int)carry << 32; carry = tmp%10;  a.d1 =  tmp/10;
+    tmp = a.d0; tmp += (long long int)carry << 32; carry = tmp%10;  a.d0 =  tmp/10;
+    digit[digits++] = carry;
+  }
+  if(digits == 0)sprintf(buf, "0");
+  else
+  {
+    digits--;
+    while(digits >= 0)
+    {
+      sprintf(&(buf[i++]), "%1d", digit[digits--]);
+    }
+  }
 }
 
 
@@ -389,18 +399,46 @@ const char* getOS() {
 #endif
 }
 
-void getOSJSON(char* string) {
+void getOSJSON(char* string)
+{
     sprintf(string, ", \"os\":{\"os\": \"%s\", \"architecture\": \"%s\"}", getOS(), getArchitecture());
 }
 
-int pstrcmp(const void* a, const void* b)
+static int cmp_int96(const void *p1, const void *p2)
+/* compare two int96, used for sorting factors with qsort() */
 {
-    int cmplen = strlen((const char*) a) - strlen((const char*) b);
-    if (cmplen > 0)
-        return 1;
-    if (cmplen < 0)
-        return -1;
-    return strcmp((const char*)a, (const char*)b);
+  unsigned int a0, a1, a2, b0, b1, b2;
+
+  a0 = (unsigned int)(((int96 *)p1)->d0);
+  a1 = (unsigned int)(((int96 *)p1)->d1);
+  a2 = (unsigned int)(((int96 *)p1)->d2);
+
+  b0 = (unsigned int)(((int96 *)p2)->d0);
+  b1 = (unsigned int)(((int96 *)p2)->d1);
+  b2 = (unsigned int)(((int96 *)p2)->d2);
+
+  // Hack: count zero values "greater" than any number on sorting
+  // to move them at the end of the array.
+  if ((a2 | a1 | a0) == 0)
+    if ((b2 | b1 | b0) != 0)
+      return 1;
+    else
+      return 0;
+  if ((b2 | b1 | b0) == 0)
+    if ((a2 | a1 | a0) != 0)
+      return -1;
+    else
+      return 0;
+
+  if (a2 > b2)       return 1;
+  else if (a1 < b2) return -1;
+  else
+    if (a1 > b1)       return 1;
+    else if (a1 < b1) return -1;
+    else
+      if (a0 > b0)       return 1;
+      else if (a0 < b0) return -1;
+      else                     return 0;
 }
 
 void print_result_line(mystuff_t *mystuff, int factorsfound)
@@ -450,23 +488,17 @@ void print_result_line(mystuff_t *mystuff, int factorsfound)
 
   if (factorsfound)
   {
-      int i = 0;
-      qsort(mystuff->factors, sizeof(mystuff->factors)/sizeof(mystuff->factors[0]), sizeof(mystuff->factors[0]), pstrcmp);
-      // skip past the empty strings
-      while (i < 10 && mystuff->factors[i][0] == 0)
+      qsort(mystuff->factors, MAX_FACTORS, sizeof(int96), &cmp_int96);
+      for (int i = 0; i < MAX_FACTORS; i++)
       {
-          i++;
-      }
-      factors_list_length = sprintf(factors_list, mystuff->factors[i]);
-      factors_quote_list_length = sprintf(factors_quote_list, "\"%s\"", mystuff->factors[i++]);
-      for (; i < 10; i++)
-      {
-          if (mystuff->factors[i][0] == 0)
+          if ((mystuff->factors[i].d0 | mystuff->factors[i].d1 | mystuff->factors[i].d2) == 0)
           {
               continue;
           }
-          factors_list_length += sprintf(factors_list + factors_list_length, ",%s", mystuff->factors[i]);
-          factors_quote_list_length += sprintf(factors_quote_list + factors_quote_list_length, ",\"%s\"", mystuff->factors[i]);
+          char buf[FACTOR_MAX_LENGTH + 1];
+          print_dez96(mystuff->factors[i], buf);
+          factors_list_length += strlen(buf) + i ? 1 : 0;
+          factors_quote_list_length += sprintf(factors_quote_list + factors_quote_list_length, i ? ",\"%s\"" : "\"%s\"", buf);
       }
   }
   else
@@ -562,7 +594,7 @@ void print_factor(mystuff_t *mystuff, int factor_number, char *factor)
     if(mystuff->print_timestamp == 1 && factor_number == 0)print_timestamp(resultfile);
   }
 
-  if(factor_number < 10)
+  if(factor_number < MAX_FACTORS)
   {
     string_length = sprintf(string, "%s%u has a factor: %s [TF:%d:%d%s:mfaktc %s %s CUDA %d.%d arch %d.%d]", NAME_NUMBERS, mystuff->exponent, factor, \
                             mystuff->bit_min, mystuff->bit_max_stage, ((mystuff->stopafterfactor == 2) && (mystuff->stats.class_counter <  max_class_counter)) ? "*" : "" , \

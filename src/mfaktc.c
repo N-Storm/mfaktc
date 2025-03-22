@@ -281,12 +281,12 @@ see benchmarks in src/kernel_benchmarks.txt */
         {
           logprintf(mystuff, "  found %d factor(s) already: ", factorsfound);
           for (i = 0; i < 10; i++)
-          {
-            if (mystuff->factors[i][0])
+            if (mystuff->factors[i].d0 || mystuff->factors[i].d1 || mystuff->factors[i].d2)
             {
-              logprintf(mystuff, "%s ", mystuff->factors[i]);
+              char factor_str_buf[FACTOR_MAX_LENGTH + 1];
+              print_dez96(mystuff->factors[i], factor_str_buf);
+              logprintf(mystuff, "%s ", factor_str_buf);
             }
-          }  
           logprintf(mystuff, "\n");
         }
         else
@@ -376,22 +376,16 @@ see benchmarks in src/kernel_benchmarks.txt */
           logprintf(mystuff, "ERROR: cudaGetLastError() returned %d: %s\n", cudaError, cudaGetErrorString(cudaError));
           return RET_CUDA_ERROR; /* bail out, we might have a serios problem (detected by cudaGetLastError())... */
         }
-        factorsfound += numfactors;
         if(mystuff->mode == MODE_NORMAL)
         {
           if (numfactors > 0)
-          {
-            char factorstring[50];
-            int96 factor;
-            for (i = 0; (i < numfactors) && (i < 10); i++)
+            for (i = 0; (i < numfactors) && (i < MAX_FACTORS); i++)
             {
-              factor.d2 = mystuff->h_RES[i * 3 + 1];
-              factor.d1 = mystuff->h_RES[i * 3 + 2];
-              factor.d0 = mystuff->h_RES[i * 3 + 3];
-              print_dez96(factor, factorstring);
-              sprintf(mystuff->factors[factorindex++], factorstring);
+              mystuff->factors[factorsfound + i].d2 = mystuff->h_RES[i * 3 + 1];
+              mystuff->factors[factorsfound + i].d1 = mystuff->h_RES[i * 3 + 2];
+              mystuff->factors[factorsfound + i].d0 = mystuff->h_RES[i * 3 + 3];
             }
-          }
+          factorsfound += numfactors;
           if(mystuff->checkpoints == 1)
           {
             if (numfactors > 0 || timer_diff(&timer_last_checkpoint) / 1000000 >= (unsigned long long int)mystuff->checkpointdelay || mystuff->quit)
@@ -410,6 +404,11 @@ see benchmarks in src/kernel_benchmarks.txt */
           }
           if((mystuff->stopafterfactor >= 2) && (factorsfound > 0) && (cur_class != max_class))cur_class = max_class + 1;
         }
+        else
+        {
+          factorsfound += numfactors;
+        }
+
       }
       fflush(NULL);
     }
@@ -1133,10 +1132,7 @@ int main(int argc, char **argv)
         mystuff.bit_max_assignment = bit_max;
         mystuff.assignment_key[0] = 0;
       }
-      for (i = 0; i < 10; i++)
-      {
-          mystuff.factors[i][0] = 0;
-      }
+      memset(&((mystuff.factors)), 0, sizeof(int96) * MAX_FACTORS);
       if(parse_ret == OK)
       {
         if(mystuff.verbosity >= 1)logprintf(&mystuff, "got assignment: exp=%u bit_min=%d bit_max=%d (%.2f GHz-days)\n", mystuff.exponent, mystuff.bit_min, mystuff.bit_max_assignment, primenet_ghzdays(mystuff.exponent, mystuff.bit_min, mystuff.bit_max_assignment));

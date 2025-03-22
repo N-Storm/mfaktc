@@ -16,6 +16,11 @@ You should have received a copy of the GNU General Public License
 along with mfaktc.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <cuda.h>
+#include <cuda_runtime.h>
+
+#include "params.h"
+
 /* 72bit (3x 24bit) integer
 D=d0 + d1*(2^24) + d2*(2^48) */
 typedef struct
@@ -64,7 +69,6 @@ typedef struct
   double ghzdays;                        /* primenet GHZdays for the current assignment (current stage) */
   char kernelname[30];
 }stats_t;
-
 
 typedef struct
 {
@@ -126,7 +130,7 @@ typedef struct
   
   int quit;
   int verbosity;                       /* 0 = reduced number of screen printfs, 1 = default, >= 2 = some additional printfs */
-  int logging;                       /* 0 = logging disabled (default), 1 = logging enabled */
+  int logging;                         /* 0 = logging disabled (default), 1 = logging enabled */
   
   int selftestsize;
   int selftestrandomoffset;
@@ -136,7 +140,7 @@ typedef struct
   char V5UserID[51];                   /* primenet V5UserID and ComputerID */
   char ComputerID[51];                 /* currently only used for screen/result output */
   char assignment_key[MAX_LINE_LENGTH + 1]; /* the assignment ID */
-  char factors[10][50];                /* store factors in global state */
+  int96 factors[MAX_FACTORS];                   /* store factors in global state */
   
 }mystuff_t;                            /* FIXME: propper name needed */
 

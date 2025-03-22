@@ -95,7 +95,9 @@ DEBUG_GPU_MATH has to be enabled, too. */
 #define MFAKTC_CHECKPOINT_VERSION "0.24" /* DO NOT CHANGE! */
 #define MFAKTC_CHECKSUM_VERSION 1 /* DO NOT CHANGE! */
 
-
+#define FACTOR_MAX_LENGTH 50
+#define MAX_FACTORS 10
+#define FACTORS_BUF_LENGTH ((FACTOR_MAX_LENGTH + 1) * MAX_FACTORS)
 
 /*
 THREADS_PER_BLOCK has a hardware limit, 512 on GPUs with compute capability
