@@ -6,15 +6,15 @@ Thanks go to Ben Buhrow for his erato.cu program and to Rocke Verser for his gpu
 See (http://www.mersenneforum.org/showthread.php?t=11900) for Ben's initial work.
 
 You are free to use this code as you wish; I take no reponsibility for
-any such action.  Optionally, please be nice and tell me if you find this 
-source to be useful, or add an acknowledgement within your work. Again optionally, 
-if you add to the functionality present here please consider making those 
-additions public too, so that others may benefit from your work.	
+any such action.  Optionally, please be nice and tell me if you find this
+source to be useful, or add an acknowledgement within your work. Again optionally,
+if you add to the functionality present here please consider making those
+additions public too, so that others may benefit from your work.
 */
 
 #include <stdio.h>
 #include <cuda.h>
-#include <cuda_runtime.h>  
+#include <cuda_runtime.h>
 
 #include "params.h"
 #include "my_types.h"
@@ -25,10 +25,6 @@ additions public too, so that others may benefit from your work.
 #undef NVCC_EXTERN
 
 #undef RAW_GPU_BENCH // FIXME
-
-#if (__CUDA_ARCH__ < FERMI) /* printf is not available on CC 1.x devices */
-#undef GWDEBUG
-#endif
 
 typedef unsigned char uint8;
 typedef unsigned short uint16;
@@ -60,6 +56,16 @@ const uint32 primesHandledWithSpecialCode = 50;		// Count of primes handled with
 							// Primes 11 through 251 are handled specially
 //const uint32 primesHandledWithSpecialCode = 93;	// Count of primes handled with inline code (not using primes array)
 							// Primes 11 through 509 are handled specially
+#endif
+
+// the maximum number of threads per SM is not the same for all architectures,
+// see https://en.wikipedia.org/wiki/CUDA#Technical_specifications for details
+#if __CUDA_ARCH__ == TESLA || __CUDA_ARCH__ == 110
+#define MIN_BLOCKS_PER_MP 3
+#elif  __CUDA_ARCH__ == 120 || __CUDA_ARCH__ == 130 || __CUDA_ARCH__ == TURING
+#define MIN_BLOCKS_PER_MP 4
+#else
+#define MIN_BLOCKS_PER_MP 6
 #endif
 
 // Various useful constants
@@ -109,6 +115,7 @@ inline void __checkCudaErrors(cudaError err, const char *file, const int line )
 // would change the gen_pinv macro to not add one.
 
 // NOTE: This routine has a number of failure cases (samples below) which don't affect us, but should be investigated someday!
+// OW 2016: see mod_p_above64k() below.
 //	x mod p out of range!! x = 113175, p = 113177, pinv = 37950, r = -2
 //	x mod p out of range!! x = 126009, p = 126011, pinv = 34085, r = -2
 //	x mod p out of range!! x = 121506, p = 121507, pinv = 35348, r = -1
@@ -151,7 +158,41 @@ __device__ __inline static int mod_p (int x, int p, int pinv)
 	if (r < 0 || r >= p)
 		printf ("x mod p out of range!! x = %d, p = %d, pinv = %d, r = %d\n", x, p, pinv, r);
 #endif
+	if (r < 0 || r >= p)
+		printf ("x mod p out of range!! x = %d, p = %d, pinv = %d, r = %d\n", x, p, pinv, r);
+	return r;
+}
 
+
+__device__ __inline static int mod_p_above64k (int x, int p, int pinv)
+{
+//	int	q, r, a, b;
+
+//	q = __mulhi (x, pinv);		// quotient = x * inverse_of_p
+//	a = x - q * p;			// x mod p (but may be too large by one p)
+//	b = a - p;			// x mod p (the alternative return value)
+//	asm("slct.s32.s32 %0, %1, %2, %3;" : "=r" (r) : "r" (b) , "r" (a) , "r" (b));
+
+// CUDA compiler generated crappy PTX code for the statements above.  I replaced them with my own PTX code.
+// Even the code below generates a needless copying of x.
+
+	int	r;
+	asm ("mul.hi.s32 %0, %1, %2;\n\t"		//	r = __mulhi (x, pinv);
+	     "slct.s32.s32 %0, 0, %0, %0;\n\t"		//	r = min(0, r);	// correction for 2^16 < p < 2^17 (see above mod_p())
+	     "mul.lo.s32 %0, %0, %3;\n\t"		//	r = r * p;
+	     "sub.s32 	%1, %1, %0;\n\t"		//	x = x - r;
+	     "sub.s32 	%0, %1, %3;\n\t"		//	r = x - p;
+	     "slct.s32.s32 %0, %0, %1, %0;"		//	r = (r >= 0) ? r : x
+	     : "=r" (r), "+r" (x) : "r" (pinv), "r" (p));
+
+#ifdef GWDEBUG
+	if (pinv != gen_pinv (p))
+		printf ("p doesn't match pinv!! p = %d, pinv = %d\n", p, pinv);
+	if (r < 0 || r >= p)
+		printf ("x mod p out of range!! x = %d, p = %d, pinv = %d, r = %d\n", x, p, pinv, r);
+#endif
+	if (r < 0 || r >= p)
+		printf ("x mod p (above64k) out of range!! x = %d, p = %d, pinv = %d, r = %d\n", x, p, pinv, r);
 	return r;
 }
 
@@ -233,17 +274,17 @@ __device__ __inline static void bitOrSometimesIffy (uint8 *locsieve, uint32 bclr
 // OK as it will just cost us some extra testing of candidates which is cheaper than the cost of using
 // atomic operations.
 
-/* 
+/*
 	Expect as input a set of primes to sieve with, their inverses, and the first bit to clear.
 
-	Each block on the gpu sieves a different segment of the big bit array.  Each thread within each block 
+	Each block on the gpu sieves a different segment of the big bit array.  Each thread within each block
 	simultaneously sieves a small set of primes, marking composites within shared memory.  There is no memory
 	contention between threads because the marking process is write only.  Because each thread
 	block starts at a different part of the big bit array, a small amount of computation must
 	be done for each prime prior to sieving to figure out the first bit to clear.
 */
 
-__global__ static void __launch_bounds__(256,6) SegSieve (uint8 *big_bit_array_dev, uint8 *pinfo_dev, uint32 maxp)
+__global__ static void __launch_bounds__(THREADS_PER_BLOCK, MIN_BLOCKS_PER_MP) SegSieve (uint8 *big_bit_array_dev, uint8 *pinfo_dev, uint32 maxp)
 {
 	__shared__ uint8 locsieve[block_size_in_bytes];
 	uint32 block_start = blockIdx.x * block_size;
@@ -893,7 +934,7 @@ __global__ static void __launch_bounds__(256,6) SegSieve (uint8 *big_bit_array_d
 		p2 = pinfo32[threadsPerBlock * 2 + threadIdx.x];
 		validate_bclr (bclr2, p2);
 
-		bclr2 = mod_p (bclr2 - block_start, p2, pinv2);
+		bclr2 = mod_p_above64k (bclr2 - block_start, p2, pinv2);
 
 		// Clear (rarely) 0, 1 or (rarely) 2 bits (bug: assumes block_size = 64K)
 		if (bclr2 < block_size) {
@@ -907,7 +948,7 @@ __global__ static void __launch_bounds__(256,6) SegSieve (uint8 *big_bit_array_d
 		p = pinfo32[threadsPerBlock * 5 + threadIdx.x];
 		validate_bclr (bclr, p);
 
-		bclr = mod_p (bclr - block_start, p, pinv);
+		bclr = mod_p_above64k (bclr - block_start, p, pinv);
 
 		// Clear (rarely) 0, 1 or (rarely) 2 bits (bug: assumes block_size = 64K)
 		if (bclr < block_size) bitOr (locsieve, bclr);
@@ -939,9 +980,9 @@ __global__ static void __launch_bounds__(256,6) SegSieve (uint8 *big_bit_array_d
 		validate_bclr (bclr2, p2);
 		validate_bclr (bclr, p);
 
-		bclr3 = mod_p (bclr3 - block_start, p3, pinv3);
-		bclr2 = mod_p (bclr2 - block_start, p2, pinv2);
-		bclr = mod_p (bclr - block_start, p, pinv);
+		bclr3 = mod_p_above64k (bclr3 - block_start, p3, pinv3);
+		bclr2 = mod_p_above64k (bclr2 - block_start, p2, pinv2);
+		bclr = mod_p_above64k (bclr - block_start, p, pinv);
 
 		// Optionally clear bit (bug: assumes block_size <= 64K)
 		if (bclr3 < block_size) bitOr (locsieve, bclr3);
@@ -1104,7 +1145,7 @@ __device__ unsigned int modularinverse (uint32 n, uint32 orig_d)
 
 // Calculate the modular inverses used in computing initial bit-to-clear values
 
-__global__ static void __launch_bounds__(256,6) CalcModularInverses (uint32 exponent, int *calc_info)
+__global__ static void __launch_bounds__(THREADS_PER_BLOCK, MIN_BLOCKS_PER_MP) CalcModularInverses (uint32 exponent, int *calc_info)
 {
 	uint32	index;		// Index for prime and modinv data in calc_info
 	uint32	prime;		// The prime to work on
@@ -1135,7 +1176,7 @@ __global__ static void __launch_bounds__(256,6) CalcModularInverses (uint32 expo
 
 // Calculate the initial bit-to-clear values
 
-__global__ static void __launch_bounds__(256,6) CalcBitToClear (uint32 exponent, int96 k_base, int *calc_info, uint8 *pinfo_dev)
+__global__ static void __launch_bounds__(THREADS_PER_BLOCK, MIN_BLOCKS_PER_MP) CalcBitToClear (uint32 exponent, int96 k_base, int *calc_info, uint8 *pinfo_dev)
 {
 	uint32	index;		// Index for prime and modinv data in calc_info
 	uint32	mask;		// Mask that tells us what bits must be preserved in pinfo_dev when setting bit-to-clear
@@ -1184,14 +1225,12 @@ __global__ static void __launch_bounds__(256,6) CalcBitToClear (uint32 exponent,
 	factor_mod_p = (2 * k_mod_p * exponent + 1) % prime;
 	bit_to_clear = ((uint64) prime - factor_mod_p) * modinv % prime;
 
-#if (__CUDA_ARCH__ >= FERMI) /* printf is not available on CC 1.x devices */
 //k_base.d0 = __add_cc (k_base.d0, __umul32  (bit_to_clear, NUM_CLASSES));
 //k_base.d1 = __addc   (k_base.d1, __umul32hi(bit_to_clear, NUM_CLASSES));	/* k is limited to 2^64 -1 so there is no need for k.d2 */
 //k_mod_p = (((uint64) k_base.d1 << 32) + k_base.d0) % prime;
 //factor_mod_p = (2 * k_mod_p * exponent + 1) % prime;
 //if (factor_mod_p != 0)
 //printf ("FAIL!: %d, %d, %d\n", index, prime, bit_to_clear);
-#endif
 
 // Handle the primes that are processed with special code.  That is, they are not part of an official "row" in pinfo_dev.
 // For these primes we store bit-to-clear in a 16-bit word.
@@ -1205,7 +1244,7 @@ __global__ static void __launch_bounds__(256,6) CalcBitToClear (uint32 exponent,
 	else {
 		*pinfo32 = (*pinfo32 & mask) + bit_to_clear;
 	}
-}	
+}
 
 //
 // Sieve initialization done on the CPU
@@ -1270,8 +1309,11 @@ static	int	gpusieve_initialized = 0;
 	if (gpusieve_initialized) return;
 	gpusieve_initialized = 1;
 
-	// Prefer 48KB shared memory
-	cudaThreadSetCacheConfig(cudaFuncCachePreferShared);
+	// Prefer shared memory over L1 cache
+	if(cudaDeviceSetCacheConfig(cudaFuncCachePreferShared) != cudaSuccess)
+	{
+	  printf("WARNING: cudaDeviceSetCacheConfig(cudaFuncCachePreferShared); failed!\n");
+	}
 
 	// Allocate the big sieve array (default is 128M bits)
 	checkCudaErrors (cudaMalloc ((void**) &mystuff->d_bitarray, mystuff->gpu_sieve_size / 8));
@@ -1280,7 +1322,7 @@ static	int	gpusieve_initialized = 0;
 	// Quick hack to eliminate sieve time from GPU-code benchmarks.  Can also be used
 	// to isolate a bug by eliminating the GPU sieving code as a possible cause.
 	checkCudaErrors (cudaMemset (mystuff->d_bitarray, 0xFF, mystuff->gpu_sieve_size / 8));
-#endif  
+#endif
 
 #undef pinfo32
 #define pinfo32		((uint32 *) pinfo)
@@ -1589,7 +1631,7 @@ static uint32	last_exponent_initialized = 0;
 	// Quick hack (leave bit array set to all ones) to eliminate sieve time from GPU-code benchmarks.
 	// Can also be used to isolate a bug by eliminating the GPU sieving code as a possible cause.
 	return;
-#endif  
+#endif
 
 	// If we've already initialized this exponent, return
 	if (mystuff->exponent == last_exponent_initialized) return;
@@ -1597,7 +1639,7 @@ static uint32	last_exponent_initialized = 0;
 
 	// Calculate the modular inverses that will be used by each class to calculate initial bit-to-clear for each prime
 	CalcModularInverses<<<primes_per_thread+1, threadsPerBlock>>>(mystuff->exponent, (int *)mystuff->d_calc_bit_to_clear_info);
-	cudaThreadSynchronize ();
+	cudaDeviceSynchronize ();
 }
 
 
@@ -1611,7 +1653,7 @@ void gpusieve_init_class (mystuff_t *mystuff, unsigned long long k_min)
 	// Quick hack (leave bit array set to all ones) to eliminate sieve time from GPU-code benchmarks.
 	// Can also be used to isolate a bug by eliminating the GPU sieving code as a possible cause.
 	return;
-#endif  
+#endif
 
 	k_base.d0 =  (int) (k_min & 0xFFFFFFFF);
 	k_base.d1 =  (int) (k_min >> 32);
@@ -1619,7 +1661,7 @@ void gpusieve_init_class (mystuff_t *mystuff, unsigned long long k_min)
 
 	// Calculate the initial bit-to-clear for each prime
 	CalcBitToClear<<<primes_per_thread+1, threadsPerBlock>>>(mystuff->exponent, k_base, (int *)mystuff->d_calc_bit_to_clear_info, (uint8 *)mystuff->d_sieve_info);
-	cudaThreadSynchronize ();
+	cudaDeviceSynchronize ();
 }
 
 
@@ -1633,7 +1675,7 @@ void gpusieve (mystuff_t *mystuff, unsigned long long num_k_remaining)
 	// Quick hack (leave bit array set to all ones) to eliminate sieve time from GPU-code benchmarks.
 	// Can also be used to isolate a bug by eliminating the GPU sieving code as a possible cause.
 	return;
-#endif  
+#endif
 
 	// Sieve at most 128 million k values.
 	if ((unsigned long long) mystuff->gpu_sieve_size < num_k_remaining)
@@ -1643,6 +1685,6 @@ void gpusieve (mystuff_t *mystuff, unsigned long long num_k_remaining)
 
 	// Do some sieving on the GPU!
 	SegSieve<<<(sieve_size + block_size - 1) / block_size, threadsPerBlock>>>((uint8 *)mystuff->d_bitarray, (uint8 *)mystuff->d_sieve_info, primes_per_thread);
-	cudaThreadSynchronize ();
+	cudaDeviceSynchronize ();
 }
 

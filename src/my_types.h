@@ -1,6 +1,6 @@
 /*
 This file is part of mfaktc.
-Copyright (C) 2009, 2010, 2011, 2012, 2014  Oliver Weihe (o.weihe@t-online.de)
+Copyright (C) 2009, 2010, 2011, 2012, 2014, 2015, 2018, 2019  Oliver Weihe (o.weihe@t-online.de)
 
 mfaktc is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -92,8 +92,10 @@ typedef struct
   FILE* logfileptr;
   int num_streams, cpu_streams;
   
-  int compcapa_major;                  /* compute capability major */
-  int compcapa_minor;                  /* compute capability minor */
+  int compcapa_major;                  /* compute capability major - actual GPU */
+  int compcapa_minor;                  /* compute capability minor - actual GPU */
+  int cuda_toolkit;                    /* CUDA toolkit used for compiling) */
+  int cuda_arch;                       /* CUDA arch (--generate-code during compiletime) selected for GPU */
   int max_shared_memory;               /* maximum size of shared memory per multiprocessor (in byte) */
   
   int checkpoints, checkpointdelay, mode, stages, stopafterfactor;
@@ -134,7 +136,7 @@ typedef struct
   char V5UserID[51];                   /* primenet V5UserID and ComputerID */
   char ComputerID[51];                 /* currently only used for screen/result output */
   char assignment_key[MAX_LINE_LENGTH + 1]; /* the assignment ID */
-  char factors_string[500];            /* store factors in global state */
+  int96 factors[MAX_FACTORS_PER_JOB];  /* store factors in global state */
   
 }mystuff_t;                            /* FIXME: propper name needed */
 
@@ -143,7 +145,6 @@ typedef struct
 enum GPUKernels
 {
   AUTOSELECT_KERNEL,
-  _71BIT_MUL24,
   _75BIT_MUL32,
   _95BIT_MUL32,
   BARRETT76_MUL32,
@@ -178,3 +179,7 @@ enum MODES
 #define FERMI  200
 #define KEPLER 300
 #define KEPLER_WITH_FUNNELSHIFT 320
+#define MAXWELL 500
+#define COMPUTE_CAPABILITY_PASCAL 600
+#define VOLTA 700
+#define TURING 750

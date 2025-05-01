@@ -1,6 +1,6 @@
 /*
 This file is part of mfaktc.
-Copyright (C) 2009, 2010, 2011, 2012, 2013  Oliver Weihe (o.weihe@t-online.de)
+Copyright (C) 2009-2013, 2015, 2019, 2024  Oliver Weihe (o.weihe@t-online.de)
 
 mfaktc is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -52,14 +52,19 @@ Mersenne numbers */
 ** DEBUG options **
 ******************/
 
-/* enable for printf's from device (GPU) code. Only used in sm_20 or newer
-code path */
-//#define USE_DEVICE_PRINTF
-
-
 /* do some checks on math done on GPU (mainly division stuff) */
 //#define DEBUG_GPU_MATH
 
+/* define TRACE_FC to enable tracing of a specific Factor Candidate
+DEBUG_GPU_MATH has to be enabled, too. */
+
+//#define TRACE_FC
+
+/* M49635893 has a factor: 280164061095680036711, this is part of the
+"simple selftest" AND the full selftest */
+//#define TRACE_D2 0x0000000F
+//#define TRACE_D1 0x300EB131
+//#define TRACE_D0 0x96D84F67
 
 /* print stream and h_ktab usage */
 //#define DEBUG_STREAM_SCHEDULE
@@ -80,7 +85,18 @@ code path */
 ********************************************************************************
 *******************************************************************************/
 
-#define MFAKTC_VERSION "0.23.3" /* Do not change without consensus! */
+/*
+MFAKTC_VERSION sets the version number. You must make sure the version string
+complies with the semantic versioning scheme: https://semver.org
+
+Otherwise, the automated builds could fail in GitHub Actions.
+
+Please discuss with the community before making changes to version numbers!
+*/
+
+#define MFAKTC_VERSION "0.24.0-beta.2"
+#define MFAKTC_CHECKPOINT_VERSION "0.24"
+#define MFAKTC_CHECKSUM_VERSION 1
 
 
 /*
@@ -118,8 +134,8 @@ when the siever switches between those two code variants. */
 
 /*
 The number of CUDA streams used by mfaktc.
-The actual configuration is done in mfaktc.ini. This ini-file contains
-a small describtion, too
+The actual configuration is done in mfaktc.ini. This INI file contains
+a small description, too
 The following lines define the min, default and max value.
 */
 
@@ -159,15 +175,16 @@ The following lines define the min, default and max value.
 
 #define GPU_SIEVE_PRIMES_MIN                 0 /* GPU sieving code can work (inefficiently) with very small numbers */
 #define GPU_SIEVE_PRIMES_DEFAULT         82486 /* Default is to sieve primes up to about 1.05M */
-#define GPU_SIEVE_PRIMES_MAX           1075000 /* Primes to 16,729,793.  GPU sieve should be able to handle up to 16M. */
+#define GPU_SIEVE_PRIMES_MAX           1075000 /* Primes to 16,729,793. GPU sieve should be able to handle up to 16M. */
 
 #define GPU_SIEVE_SIZE_MIN                   4 /* A 4M bit sieve seems like a reasonable minimum */
 #define GPU_SIEVE_SIZE_DEFAULT            2047 /* Default is a 128M bit sieve */
 #define GPU_SIEVE_SIZE_MAX                2047 /* We've only tested up to 128M bits.  The GPU sieve code may be able to go higher. */
 
-#define GPU_SIEVE_PROCESS_SIZE_MIN           8 /* Processing 8K bits in each block is minimum (256 threads * 1 word of 32 bits) */
-#define GPU_SIEVE_PROCESS_SIZE_DEFAULT      16 /* Default is processing 8K bits */
-#define GPU_SIEVE_PROCESS_SIZE_MAX          32 /* Upper limit is 64K, since we store k values as "short". */
+#define GPU_SIEVE_PROCESS_SIZE_MIN           8 /* Processing 8 Kib in each block is minimum (256 threads * 1 word of 32 bits) */
+#define GPU_SIEVE_PROCESS_SIZE_DEFAULT      16 /* Default is processing 16 Kib */
+#define GPU_SIEVE_PROCESS_SIZE_MAX          32 /* Upper limit is 64K, since we store k values as "short".
+                                                  Not validated and shared memory might be an issue! */
 
 
 #ifdef WAGSTAFF
@@ -178,3 +195,6 @@ The following lines define the min, default and max value.
 
 /* For worktodo.txt files */
 #define MAX_LINE_LENGTH 100
+
+#define MAX_FACTORS_PER_JOB 20
+#define MAX_DEZ_96_STRING_LENGTH 30
