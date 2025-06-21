@@ -188,12 +188,12 @@ jobs:
           - { cuda_version: '11.5.2', os: 'windows-2022' }
           - { cuda_version: '11.4.4', os: 'windows-2022' }
           - { cuda_version: '11.3.1', os: 'windows-2022' }
-          - { cuda_version: '11.2.2', os: 'windows-2019' }
-          - { cuda_version: '11.1.1', os: 'windows-2019' }
-          - { cuda_version: '11.0.1', os: 'windows-2019' }
-          - { cuda_version: '10.0.130', os: 'windows-2019' }
-          - { cuda_version: '9.2.148', os: 'windows-2019' }
-          - { cuda_version: '8.0.61', os: 'windows-2019' }
+          - { cuda_version: '11.2.2', os: 'windows-2022', vcvars_ver: '14.29' }
+          - { cuda_version: '11.1.1', os: 'windows-2022', vcvars_ver: '14.29' }
+          - { cuda_version: '11.0.1', os: 'windows-2022', vcvars_ver: '14.29' }
+          - { cuda_version: '10.0.130', os: 'windows-2022', vcvars_ver: '14.16' }
+          - { cuda_version: '9.2.148', os: 'windows-2022', vcvars_ver: '14.16' }
+          - { cuda_version: '8.0.61', os: 'windows-2022', vcvars_ver: '14.16' }
 
     steps:
 
@@ -225,7 +225,8 @@ jobs:
           cat .github/workflows/scripts/build_helper.sh.out >> $GITHUB_OUTPUT
 
       - name: Build from sources with MSVC 2022 using PowerShell
-        if: ${{ matrix.sys.os == 'windows-2022' }}
+        if: ${{ matrix.sys.os != 'windows-2019' && matrix.sys.vcvars_ver == '' }}
+        # if: ${{ matrix.sys.os != 'windows-2019' && (steps.prepare.outputs.CUDA_VER_MAJOR >= 12 || (steps.prepare.outputs.CUDA_VER_MAJOR == 11 && steps.prepare.outputs.CUDA_VER_MINOR >= 3)) }}
         shell: powershell
         # MSVC 2022 on the Windows 2022 Server runner has a PowerShell script to
         # launch a development shell.
@@ -235,8 +236,8 @@ jobs:
           Copy-Item mfaktc.ini ..
           make SHELL="powershell.exe" -f Makefile.win
 
-      - name: Build from sources with MSVC 2019 using cmd.exe
-        if: ${{ matrix.sys.os == 'windows-2019' }}
+      - name: Build from sources with MSVC using cmd.exe
+        if: ${{ matrix.sys.os == 'windows-2019' || matrix.sys.vcvars_ver != '' }}
         shell: cmd
         # MSVC 2019 has a similar script on the Windows 2019 Server runner, but
         # that only supports a 32-bit (x86) environment and doesn't allow
@@ -245,11 +246,15 @@ jobs:
         # then launch PowerShell from make afterwards. PowerShell is much better
         # at handling long paths and quotes when invoked from make.
         run: |
-          "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat" x64 ${{ env.VCVARS_VER }} & cd src & copy mfaktc.ini .. & make SHELL="powershell.exe" -f Makefile.win
+          ${{ env.MSVC_ADD_PKG }}
+          "C:\Program Files (x86)\Microsoft Visual Studio\${{ env.MSVC_VER }}\Enterprise\VC\Auxiliary\Build\vcvars64.bat" x64 ${{ env.VCVARS_VER }} & cd src & copy mfaktc.ini .. & make SHELL="powershell.exe" -j%NUMBER_OF_PROCESSORS% -f Makefile.win
         env:
+          MSVC_VER: ${{ matrix.sys.os == 'windows-2019' && '2019' || '2022' }}
           # -vcvars_ver=14.0 enables the MSVC 14.0 (2015) build environment -
           # this is an MSVC 2019 component and not a complete MSVC instance.
-          VCVARS_VER: ${{ steps.prepare.outputs.CUDA_VER_MAJOR <= 10 && '-vcvars_ver=14.0' || '' }}
+          # VCVARS_VER: ${{ steps.prepare.outputs.CUDA_VER_MAJOR <= 10 && '-vcvars_ver=14.0' || '' }}
+          VCVARS_VAR: ${{ matrix.sys.vcvars_ver != '' && format('-vcvars_var={0}', matrix.sys.vcvars_ver) || '' }}
+          MSVC_ADD_PKG: ${{ matrix.sys.vcvars_ver == '14.16' && '"C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --passive --norestart --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" --add "Microsoft.VisualStudio.Component.VC.v141.x86.x64" & timeout 20' || 'echo' }}
 
       - name: Prepare build archive with description
         shell: bash
