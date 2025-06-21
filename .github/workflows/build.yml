@@ -247,14 +247,14 @@ jobs:
         # at handling long paths and quotes when invoked from make.
         run: |
           ${{ env.MSVC_ADD_PKG }}
-          "C:\Program Files (x86)\Microsoft Visual Studio\${{ env.MSVC_VER }}\Enterprise\VC\Auxiliary\Build\vcvars64.bat" x64 ${{ env.VCVARS_VER }} & cd src & copy mfaktc.ini .. & make SHELL="powershell.exe" -j%NUMBER_OF_PROCESSORS% -f Makefile.win
+          "${{ env.MSVC_PATH }}" x64 ${{ env.VCVARS_VER }} & cd src & copy mfaktc.ini .. & make SHELL="powershell.exe" -f Makefile.win
         env:
-          MSVC_VER: ${{ matrix.sys.os == 'windows-2019' && '2019' || '2022' }}
+          MSVC_PATH: ${{ matrix.sys.os == 'windows-2019' && 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat' || 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat' }}
           # -vcvars_ver=14.0 enables the MSVC 14.0 (2015) build environment -
           # this is an MSVC 2019 component and not a complete MSVC instance.
           # VCVARS_VER: ${{ steps.prepare.outputs.CUDA_VER_MAJOR <= 10 && '-vcvars_ver=14.0' || '' }}
-          VCVARS_VAR: ${{ matrix.sys.vcvars_ver != '' && format('-vcvars_var={0}', matrix.sys.vcvars_ver) || '' }}
-          MSVC_ADD_PKG: ${{ matrix.sys.vcvars_ver == '14.16' && '"C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --passive --norestart --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" --add "Microsoft.VisualStudio.Component.VC.v141.x86.x64" & timeout 20' || 'echo' }}
+          VCVARS_VER: ${{ matrix.sys.vcvars_ver != '' && format('-vcvars_ver={0}', matrix.sys.vcvars_ver) || '' }}
+          MSVC_ADD_PKG: ${{ matrix.sys.vcvars_ver == '14.16' && '"C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --passive --norestart --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" --add "Microsoft.VisualStudio.Component.VC.v141.x86.x64" & timeout 20' || 'echo -j%NUMBER_OF_PROCESSORS%' }}
 
       - name: Prepare build archive with description
         shell: bash
