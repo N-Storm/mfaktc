@@ -196,6 +196,12 @@ jobs:
           - { cuda_version: '9.2.148', os: 'windows-2022', vcvars_ver: '14.0' }
           - { cuda_version: '8.0.61', os: 'windows-2022', vcvars_ver: '14.0' }
 
+    env:
+      MSVC_PKG_VC140: Microsoft.VisualStudio.Component.VC.140
+      MSVC_PKG_VC141: Microsoft.VisualStudio.Component.VC.v141.x86.x64
+      MSVC_SETUP_CMD: '"C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --passive --norestart --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise"'
+      # MSVC_ADD_PKG_CMD: "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --passive --norestart --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" --add "${0}"
+
     steps:
 
       - name: Checkout repo
@@ -247,27 +253,43 @@ jobs:
         # then launch PowerShell from make afterwards. PowerShell is much better
         # at handling long paths and quotes when invoked from make.
         run: |
-          echo DEBUG: INSTALL PKG START
-          "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --passive --norestart --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" --add "Microsoft.VisualStudio.Component.VC.v141.x86.x64"
-          echo DEBUG: INSTALL PKG END
-          echo DEBUG: INSTALL PKG2 START
-          "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --passive --norestart --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" --add "Microsoft.VisualStudio.Component.VC.140"
-          echo DEBUG: INSTALL PKG2 END
-          timeout 15
-          "${{ env.MSVC_PATH }}" x64 ${{ env.VCVARS_VER }} & cd src & copy mfaktc.ini .. & cl & env & make SHELL="powershell.exe" -j%NUMBER_OF_PROCESSORS% -f Makefile.win
+          echo MSVC_ADD_PKG:  ${{ env.MSVC_ADD_PKG }}
+          echo MSVC_ADD_PKG2: ${{ env.MSVC_ADD_PKG2 }}
+          echo MSVC_ADD_PKG3: ${{ env.MSVC_ADD_PKG3 }}
+          echo MSVC package install starts...
+          ${{ env.MSVC_ADD_PKG }}
+          "${{ env.VCVARS_PATH }}" x64 ${{ env.VCVARS_VER }} & cd src & copy mfaktc.ini .. & make SHELL="powershell.exe" -j%NUMBER_OF_PROCESSORS% -f Makefile.win
         env:
-          MSVC_PATH: ${{ matrix.sys.os == 'windows-2019' && 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat' || 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat' }}
+          VCVARS_PATH: ${{ matrix.sys.os == 'windows-2019' && 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat' || 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat' }}
           # -vcvars_ver=14.0 enables the MSVC 14.0 (2015) build environment -
           # this is an MSVC 2019 component and not a complete MSVC instance.
           # VCVARS_VER: ${{ steps.prepare.outputs.CUDA_VER_MAJOR <= 10 && '-vcvars_ver=14.0' || '' }}
           VCVARS_VER: ${{ matrix.sys.vcvars_ver != '' && format('-vcvars_ver={0}', matrix.sys.vcvars_ver) || '' }}
           # MSVC_ADD_PKG: ${{ matrix.sys.vcvars_ver != '' && '"C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --passive --norestart --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" --add "Microsoft.VisualStudio.Component.VC.v141.x86.x64"' || 'echo' }}
+          MSVC_ADD_PKG: |
+            ${{ (
+               matrix.sys.vcvars_ver == '14.0'  && format('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --passive --norestart --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" --add {0}', env.MSVC_PKG_VC140)
+            || matrix.sys.vcvars_ver == '14.16' && format('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --passive --norestart --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" --add {0}', env.MSVC_PKG_VC141)
+            || 'REM No component to install'
+            ) }}
+          MSVC_ADD_PKG2: |
+            ${{ (
+               matrix.sys.vcvars_ver == '14.0'  && format('{0} --add {1}', env.MSVC_SETUP_CMD, env.MSVC_PKG_VC140)
+            || matrix.sys.vcvars_ver == '14.16' && format('{0} --add {1}', env.MSVC_SETUP_CMD, env.MSVC_PKG_VC141)
+            || 'REM No component to install'
+            ) }}
+          MSVC_ADD_PKG3: |
+            ${{ (
+               steps.prepare.outputs.CUDA_VER_MAJOR <= 9 && format('{0} --add {1}', env.MSVC_SETUP_CMD, env.MSVC_PKG_VC140)
+            || steps.prepare.outputs.CUDA_VER_MAJOR == 10 && format('{0} --add {1}', env.MSVC_SETUP_CMD, env.MSVC_PKG_VC141)
+            || 'REM No component to install'
+            ) }}
 
       - name: Prepare build archive with description
         shell: bash
         run: |
           # zip -9 -j "${{ steps.prepare.outputs.BASE_NAME }}.zip" *
-          tar -a -c -f "${{ steps.prepare.outputs.BASE_NAME }}.zip" *
+          tar -a -c --exclude "cuda*" -f "${{ steps.prepare.outputs.BASE_NAME }}.zip" *
           echo "[${{ steps.prepare.outputs.BASE_NAME }}.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.prepare.outputs.BASE_NAME }}.zip) | \
           ${{ matrix.sys.cuda_version }} | ${{ steps.prepare.outputs.CC_MIN }}-${{ steps.prepare.outputs.CC_MAX }} | ${{ steps.prepare.outputs.OS_VER }} | \
           ${{ steps.prepare.outputs.COMPILER_VER }} | ${{ steps.prepare.outputs.NVCC_VER }}" > ${{ steps.prepare.outputs.BASE_NAME }}.txt
