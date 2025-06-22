@@ -41,6 +41,7 @@ jobs:
 # Begin job "build-linux"
   build-linux:
     runs-on: ubuntu-latest
+    if: false
 
     strategy:
       # If set to true, all jobs within the same matrix (such as Linux or
@@ -173,27 +174,33 @@ jobs:
         # Available versions can be viewed at the Jimver/cuda-toolkit action sources:
         # https://github.com/Jimver/cuda-toolkit/blob/v0.2.24/src/links/windows-links.ts
         sys:
-          - { cuda_version: '12.9.0', os: 'windows-2022' }
-          - { cuda_version: '12.8.1', os: 'windows-2022' }
-          - { cuda_version: '12.6.3', os: 'windows-2022' }
-          - { cuda_version: '12.5.1', os: 'windows-2022' }
-          - { cuda_version: '12.4.1', os: 'windows-2022' }
-          - { cuda_version: '12.3.2', os: 'windows-2022' }
-          - { cuda_version: '12.2.2', os: 'windows-2022' }
-          - { cuda_version: '12.1.1', os: 'windows-2022' }
-          - { cuda_version: '12.0.1', os: 'windows-2022' }
-          - { cuda_version: '11.8.0', os: 'windows-2022' }
-          - { cuda_version: '11.7.1', os: 'windows-2022' }
-          - { cuda_version: '11.6.2', os: 'windows-2022' }
-          - { cuda_version: '11.5.2', os: 'windows-2022' }
-          - { cuda_version: '11.4.4', os: 'windows-2022' }
+          - { cuda_version: '12.9.0', os: 'windows-2025' }
+          # - { cuda_version: '12.8.1', os: 'windows-2022' }
+          # - { cuda_version: '12.6.3', os: 'windows-2022' }
+          # - { cuda_version: '12.5.1', os: 'windows-2022' }
+          # - { cuda_version: '12.4.1', os: 'windows-2022' }
+          # - { cuda_version: '12.3.2', os: 'windows-2022' }
+          # - { cuda_version: '12.2.2', os: 'windows-2022' }
+          # - { cuda_version: '12.1.1', os: 'windows-2022' }
+          # - { cuda_version: '12.0.1', os: 'windows-2022' }
+          # - { cuda_version: '11.8.0', os: 'windows-2022' }
+          # - { cuda_version: '11.7.1', os: 'windows-2022' }
+          # - { cuda_version: '11.6.2', os: 'windows-2022' }
+          # - { cuda_version: '11.5.2', os: 'windows-2022' }
+          # - { cuda_version: '11.4.4', os: 'windows-2022' }
           - { cuda_version: '11.3.1', os: 'windows-2022' }
           - { cuda_version: '11.2.2', os: 'windows-2022', vcvars_ver: '14.29' }
           - { cuda_version: '11.1.1', os: 'windows-2022', vcvars_ver: '14.29' }
           - { cuda_version: '11.0.1', os: 'windows-2022', vcvars_ver: '14.29' }
           - { cuda_version: '10.0.130', os: 'windows-2022', vcvars_ver: '14.16' }
-          - { cuda_version: '9.2.148', os: 'windows-2022', vcvars_ver: '14.16' }
-          - { cuda_version: '8.0.61', os: 'windows-2022', vcvars_ver: '14.16' }
+          - { cuda_version: '9.2.148', os: 'windows-2022', vcvars_ver: '14.0' }
+          - { cuda_version: '8.0.61', os: 'windows-2022', vcvars_ver: '14.0' }
+
+    env:
+      MSVC_PKG_VC140: Microsoft.VisualStudio.Component.VC.140
+      MSVC_PKG_VC141: Microsoft.VisualStudio.Component.VC.v141.x86.x64
+      MSVC_SETUP_CMD: '"C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --passive --norestart --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise"'
+      # MSVC_ADD_PKG_CMD: "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --passive --norestart --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" --add "${0}"
 
     steps:
 
@@ -224,43 +231,51 @@ jobs:
           bash .github/workflows/scripts/build_helper.sh ${{ matrix.sys.cuda_version }}
           cat .github/workflows/scripts/build_helper.sh.out >> $GITHUB_OUTPUT
 
+      # For CUDA versions starting from 11.3 we can use PowerShell development
+      # shell script to build
       - name: Build from sources with MSVC 2022 using PowerShell
-        if: ${{ matrix.sys.os != 'windows-2019' && matrix.sys.vcvars_ver == '' }}
-        # if: ${{ matrix.sys.os != 'windows-2019' && (steps.prepare.outputs.CUDA_VER_MAJOR >= 12 || (steps.prepare.outputs.CUDA_VER_MAJOR == 11 && steps.prepare.outputs.CUDA_VER_MINOR >= 3)) }}
+        if: ${{ steps.prepare.outputs.CUDA_VER_MAJOR >= 12 || (steps.prepare.outputs.CUDA_VER_MAJOR == 11 && steps.prepare.outputs.CUDA_VER_MINOR >= 3) }}
         shell: powershell
-        # MSVC 2022 on the Windows 2022 Server runner has a PowerShell script to
-        # launch a development shell.
         run: |
           & 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Launch-VsDevShell.ps1' -Arch amd64 -HostArch amd64
           cd "${{ github.workspace }}\src"
           Copy-Item mfaktc.ini ..
           make SHELL="powershell.exe" -f Makefile.win
 
-      - name: Build from sources with MSVC using cmd.exe
-        if: ${{ matrix.sys.os == 'windows-2019' || matrix.sys.vcvars_ver != '' }}
+      # PowerShell script doesn't works running previous versions of the build
+      # environment. So we have to run a batch file to configure an environment and
+      # then launch PowerShell from make afterwards. PowerShell is much better
+      # at handling long paths and quotes when invoked from make.
+      - name: Build from sources with MSVC
+        if: ${{ steps.prepare.outputs.CUDA_VER_MAJOR <= 10 || (steps.prepare.outputs.CUDA_VER_MAJOR == 11 && steps.prepare.outputs.CUDA_VER_MINOR <= 2) }}
         shell: cmd
-        # MSVC 2019 has a similar script on the Windows 2019 Server runner, but
-        # that only supports a 32-bit (x86) environment and doesn't allow
-        # setting the architecture.
-        # So we have to run a batch file to configure a 64-bit environment and
-        # then launch PowerShell from make afterwards. PowerShell is much better
-        # at handling long paths and quotes when invoked from make.
         run: |
-          ${{ env.MSVC_ADD_PKG }}
-          "C:\Program Files (x86)\Microsoft Visual Studio\${{ env.MSVC_VER }}\Enterprise\VC\Auxiliary\Build\vcvars64.bat" x64 ${{ env.VCVARS_VER }} & cd src & copy mfaktc.ini .. & make SHELL="powershell.exe" -j%NUMBER_OF_PROCESSORS% -f Makefile.win
+          ${{ env.MSVC_ADD_PKG_CMD }}
+          "${{ env.VCVARS_PATH }}" x64 ${{ env.VCVARS_VER }} & cd src & copy mfaktc.ini .. & make SHELL="powershell.exe" -j%NUMBER_OF_PROCESSORS% -f Makefile.win
         env:
-          MSVC_VER: ${{ matrix.sys.os == 'windows-2019' && '2019' || '2022' }}
-          # -vcvars_ver=14.0 enables the MSVC 14.0 (2015) build environment -
-          # this is an MSVC 2019 component and not a complete MSVC instance.
-          # VCVARS_VER: ${{ steps.prepare.outputs.CUDA_VER_MAJOR <= 10 && '-vcvars_ver=14.0' || '' }}
-          VCVARS_VAR: ${{ matrix.sys.vcvars_ver != '' && format('-vcvars_var={0}', matrix.sys.vcvars_ver) || '' }}
-          MSVC_ADD_PKG: ${{ matrix.sys.vcvars_ver == '14.16' && '"C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --passive --norestart --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" --add "Microsoft.VisualStudio.Component.VC.v141.x86.x64" & timeout 20' || 'echo' }}
+          # VCVARS_PATH: ${{ matrix.sys.os == 'windows-2019' && 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat' || 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat' }}
+          VCVARS_PATH: 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat'
+          # vcvars_ver=14.X enables previous versions of MSVC build environments (MSVC 2015: 14.0, MSVC 2017: 14.16, MSVC 2019: 14.29)
+          VCVARS_VER: |
+            ${{ (steps.prepare.outputs.CUDA_VER_MAJOR <= 9 && '-vcvars_ver=14.0'
+              || steps.prepare.outputs.CUDA_VER_MAJOR == 10 && '-vcvars_ver=14.16'
+              || steps.prepare.outputs.CUDA_VER_MAJOR == 11 && steps.prepare.outputs.CUDA_VER_MINOR <= 2 && '-vcvars_ver=14.29'
+              || '') }}
+          # windows-2022 runner comes with MSVC 2019 component (named VC142 internally) installed,
+          # but versions prior needs to be installed by running '${MSVC_SETUP_CMD} --add PKG_NAME'
+          # ${MSVC_PKG_VC140} required for 14.0 (MSVC 2015), and ${MSVC_PKG_VC141} for 14.16 (MSVC 2017)
+          MSVC_ADD_PKG_CMD: |
+            ${{ (
+               steps.prepare.outputs.CUDA_VER_MAJOR <= 9 && format('{0} --add {1}', env.MSVC_SETUP_CMD, env.MSVC_PKG_VC140)
+            || steps.prepare.outputs.CUDA_VER_MAJOR == 10 && format('{0} --add {1}', env.MSVC_SETUP_CMD, env.MSVC_PKG_VC141)
+            || 'REM No component to install'
+            ) }}
 
       - name: Prepare build archive with description
         shell: bash
         run: |
-          choco install -y --no-progress zip
-          zip -9 -j "${{ steps.prepare.outputs.BASE_NAME }}.zip" *
+          # zip -9 -j "${{ steps.prepare.outputs.BASE_NAME }}.zip" *
+          tar -a -c -f "${{ steps.prepare.outputs.BASE_NAME }}.zip" Changelog.txt COPYING mfaktc-win-64.* mfaktc.ini README.txt
           echo "[${{ steps.prepare.outputs.BASE_NAME }}.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.prepare.outputs.BASE_NAME }}.zip) | \
           ${{ matrix.sys.cuda_version }} | ${{ steps.prepare.outputs.CC_MIN }}-${{ steps.prepare.outputs.CC_MAX }} | ${{ steps.prepare.outputs.OS_VER }} | \
           ${{ steps.prepare.outputs.COMPILER_VER }} | ${{ steps.prepare.outputs.NVCC_VER }}" > ${{ steps.prepare.outputs.BASE_NAME }}.txt
