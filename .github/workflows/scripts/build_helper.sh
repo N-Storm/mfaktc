@@ -88,6 +88,8 @@ if [ "$CUDA_VER" -lt 1200 ]; then
 fi
 
 echo 'Gathering version info on generic compiler and NVCC...'
+# COMPILER_VER for Windows builds actually set to MSVC product version.
+# Workflow gets version from cl.exe on the build stage later and adds it to the report.
 if [[ -x "$(command -v vswhere.exe)" ]]; then
   CC_VSPROD="$(vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property displayName | sed -e 's/Visual Studio/MSVC/')"
   COMPILER_VER="${CC_VSPROD}, $(vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationVersion)"

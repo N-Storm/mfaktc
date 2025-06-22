@@ -41,7 +41,6 @@ jobs:
 # Begin job "build-linux"
   build-linux:
     runs-on: ubuntu-latest
-    if: false
 
     strategy:
       # If set to true, all jobs within the same matrix (such as Linux or
@@ -175,26 +174,26 @@ jobs:
         # https://github.com/Jimver/cuda-toolkit/blob/v0.2.24/src/links/windows-links.ts
         sys:
           - { cuda_version: '12.9.0', os: 'windows-2025' }
-          # - { cuda_version: '12.8.1', os: 'windows-2022' }
-          # - { cuda_version: '12.6.3', os: 'windows-2022' }
-          # - { cuda_version: '12.5.1', os: 'windows-2022' }
-          # - { cuda_version: '12.4.1', os: 'windows-2022' }
-          # - { cuda_version: '12.3.2', os: 'windows-2022' }
-          # - { cuda_version: '12.2.2', os: 'windows-2022' }
-          # - { cuda_version: '12.1.1', os: 'windows-2022' }
-          # - { cuda_version: '12.0.1', os: 'windows-2022' }
-          # - { cuda_version: '11.8.0', os: 'windows-2022' }
-          # - { cuda_version: '11.7.1', os: 'windows-2022' }
-          # - { cuda_version: '11.6.2', os: 'windows-2022' }
-          # - { cuda_version: '11.5.2', os: 'windows-2022' }
-          # - { cuda_version: '11.4.4', os: 'windows-2022' }
-          - { cuda_version: '11.3.1', os: 'windows-2022' }
-          - { cuda_version: '11.2.2', os: 'windows-2022' }
-          - { cuda_version: '11.1.1', os: 'windows-2022' }
-          - { cuda_version: '11.0.1', os: 'windows-2022' }
-          - { cuda_version: '10.0.130', os: 'windows-2022' }
-          - { cuda_version: '9.2.148', os: 'windows-2022' }
-          - { cuda_version: '8.0.61', os: 'windows-2022' }
+          - { cuda_version: '12.8.1', os: 'windows-2025' }
+          - { cuda_version: '12.6.3', os: 'windows-2025' }
+          - { cuda_version: '12.5.1', os: 'windows-2025' }
+          - { cuda_version: '12.4.1', os: 'windows-2025' }
+          - { cuda_version: '12.3.2', os: 'windows-2025' }
+          - { cuda_version: '12.2.2', os: 'windows-2025' }
+          - { cuda_version: '12.1.1', os: 'windows-2025' }
+          - { cuda_version: '12.0.1', os: 'windows-2025' }
+          - { cuda_version: '11.8.0', os: 'windows-2025' }
+          - { cuda_version: '11.7.1', os: 'windows-2025' }
+          - { cuda_version: '11.6.2', os: 'windows-2025' }
+          - { cuda_version: '11.5.2', os: 'windows-2025' }
+          - { cuda_version: '11.4.4', os: 'windows-2025' }
+          - { cuda_version: '11.3.1', os: 'windows-2025' }
+          - { cuda_version: '11.2.2', os: 'windows-2025' }
+          - { cuda_version: '11.1.1', os: 'windows-2025' }
+          - { cuda_version: '11.0.1', os: 'windows-2025' }
+          - { cuda_version: '10.0.130', os: 'windows-2025' }
+          - { cuda_version: '9.2.148', os: 'windows-2025' }
+          - { cuda_version: '8.0.61', os: 'windows-2025' }
 
     env:
       MSVC_PKG_VC140: Microsoft.VisualStudio.Component.VC.140
@@ -258,6 +257,9 @@ jobs:
       - name: Prepare build archive with description
         shell: bash
         run: |
+          # We can't get actual compiler (cl.exe) version with helper script, because it might be not installed on the 'prepare' stage.
+          # COMPILER_VER from that stage contains MSVC version, but not the compiler which has it's own version number.
+          # So a little hack was to log cl version during the build stage and now we pick and use it in report along with MSVC version.
           [ -f src/clversion.log ] && CL_VER="$(grep -Eoe 'Version [\.0-9]+ ' src/clversion.log | cut -d' ' -f2)"
           [ -z "$CL_VER" ] && CL_VER='Unknown'
           tar -a -c -f "${{ steps.prepare.outputs.BASE_NAME }}.zip" Changelog.txt COPYING mfaktc-win-64.* mfaktc.ini README.txt
