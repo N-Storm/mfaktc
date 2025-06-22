@@ -230,29 +230,12 @@ jobs:
           bash .github/workflows/scripts/build_helper.sh ${{ matrix.sys.cuda_version }}
           cat .github/workflows/scripts/build_helper.sh.out >> $GITHUB_OUTPUT
 
-      # For CUDA versions starting from 11.3 we can use PowerShell development
-      # shell script to build
-      # - name: Build from sources with MSVC 2022 using PowerShell
-      #   if: ${{ steps.prepare.outputs.CUDA_VER_MAJOR >= 12 || (steps.prepare.outputs.CUDA_VER_MAJOR == 11 && steps.prepare.outputs.CUDA_VER_MINOR >= 3) }}
-      #   shell: powershell
-      #   run: |
-      #     & 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Launch-VsDevShell.ps1' -Arch amd64 -HostArch amd64
-      #     cd "${{ github.workspace }}\src"
-      #     Copy-Item mfaktc.ini ..
-      #     make SHELL="powershell.exe" -f Makefile.win
-
-      # PowerShell script doesn't works running previous versions of the build
-      # environment. So we have to run a batch file to configure an environment and
-      # then launch PowerShell from make afterwards. PowerShell is much better
-      # at handling long paths and quotes when invoked from make.
       - name: Build from sources with MSVC
-        # if: ${{ steps.prepare.outputs.CUDA_VER_MAJOR <= 10 || (steps.prepare.outputs.CUDA_VER_MAJOR == 11 && steps.prepare.outputs.CUDA_VER_MINOR <= 2) }}
         shell: cmd
         run: |
           ${{ env.MSVC_ADD_PKG_CMD }}
-          "${{ env.VCVARS_PATH }}" x64 ${{ env.VCVARS_VER }} & cd src & copy mfaktc.ini .. & make SHELL="powershell.exe" -j%NUMBER_OF_PROCESSORS% -f Makefile.win
+          "${{ env.VCVARS_PATH }}" x64 ${{ env.VCVARS_VER }} & cd src & copy mfaktc.ini .. & make SHELL="powershell.exe" -j%NUMBER_OF_PROCESSORS% -f Makefile.win & cl /? 2>&1 | findstr /C:"Version" > clversion.log & echo Build finished
         env:
-          # VCVARS_PATH: ${{ matrix.sys.os == 'windows-2019' && 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat' || 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat' }}
           VCVARS_PATH: 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat'
           # vcvars_ver=14.X enables previous versions of MSVC build environments (MSVC 2015: 14.0, MSVC 2017: 14.16, MSVC 2019: 14.29)
           VCVARS_VER: >-
@@ -275,11 +258,11 @@ jobs:
       - name: Prepare build archive with description
         shell: bash
         run: |
-          # zip -9 -j "${{ steps.prepare.outputs.BASE_NAME }}.zip" *
+          if [[ -f src/clversion.log ]]; then CL_VER="$(cat src/clversion.log | grep -Eoe 'Version [\.0-9]+ ' | cut -d' ' -f2)"; fi
           tar -a -c -f "${{ steps.prepare.outputs.BASE_NAME }}.zip" Changelog.txt COPYING mfaktc-win-64.* mfaktc.ini README.txt
           echo "[${{ steps.prepare.outputs.BASE_NAME }}.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.prepare.outputs.BASE_NAME }}.zip) | \
           ${{ matrix.sys.cuda_version }} | ${{ steps.prepare.outputs.CC_MIN }}-${{ steps.prepare.outputs.CC_MAX }} | ${{ steps.prepare.outputs.OS_VER }} | \
-          ${{ steps.prepare.outputs.COMPILER_VER }} | ${{ steps.prepare.outputs.NVCC_VER }}" > ${{ steps.prepare.outputs.BASE_NAME }}.txt
+          ${CL_VER} (${{ steps.prepare.outputs.COMPILER_VER }}) | ${{ steps.prepare.outputs.NVCC_VER }}" > ${{ steps.prepare.outputs.BASE_NAME }}.txt
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
