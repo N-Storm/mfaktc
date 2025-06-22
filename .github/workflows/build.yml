@@ -232,21 +232,21 @@ jobs:
 
       # For CUDA versions starting from 11.3 we can use PowerShell development
       # shell script to build
-      - name: Build from sources with MSVC 2022 using PowerShell
-        if: ${{ steps.prepare.outputs.CUDA_VER_MAJOR >= 12 || (steps.prepare.outputs.CUDA_VER_MAJOR == 11 && steps.prepare.outputs.CUDA_VER_MINOR >= 3) }}
-        shell: powershell
-        run: |
-          & 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Launch-VsDevShell.ps1' -Arch amd64 -HostArch amd64
-          cd "${{ github.workspace }}\src"
-          Copy-Item mfaktc.ini ..
-          make SHELL="powershell.exe" -f Makefile.win
+      # - name: Build from sources with MSVC 2022 using PowerShell
+      #   if: ${{ steps.prepare.outputs.CUDA_VER_MAJOR >= 12 || (steps.prepare.outputs.CUDA_VER_MAJOR == 11 && steps.prepare.outputs.CUDA_VER_MINOR >= 3) }}
+      #   shell: powershell
+      #   run: |
+      #     & 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Launch-VsDevShell.ps1' -Arch amd64 -HostArch amd64
+      #     cd "${{ github.workspace }}\src"
+      #     Copy-Item mfaktc.ini ..
+      #     make SHELL="powershell.exe" -f Makefile.win
 
       # PowerShell script doesn't works running previous versions of the build
       # environment. So we have to run a batch file to configure an environment and
       # then launch PowerShell from make afterwards. PowerShell is much better
       # at handling long paths and quotes when invoked from make.
       - name: Build from sources with MSVC
-        if: ${{ steps.prepare.outputs.CUDA_VER_MAJOR <= 10 || (steps.prepare.outputs.CUDA_VER_MAJOR == 11 && steps.prepare.outputs.CUDA_VER_MINOR <= 2) }}
+        # if: ${{ steps.prepare.outputs.CUDA_VER_MAJOR <= 10 || (steps.prepare.outputs.CUDA_VER_MAJOR == 11 && steps.prepare.outputs.CUDA_VER_MINOR <= 2) }}
         shell: cmd
         run: |
           ${{ env.MSVC_ADD_PKG_CMD }}
