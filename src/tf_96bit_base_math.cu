@@ -63,8 +63,7 @@ res = a - b */
 __device__ static void mul_96(int96 *res, int96 a, int96 b)
 /* res = a * b (only lower 96 bits of the result) */
 {
-//#if (__CUDA_ARCH__ >= MAXWELL)
-#if (__CUDA_ARCH__ >= 9999)
+#if (__CUDA_ARCH__ >= MAXWELL) && (CUDART_VERSION >= 12000) // CUDA versions 12.0 and up
 
     // Step 1: r0 = a0 * b0 (lower 32 bits)
     uint64_t t0 = (uint64_t)a.d0 * b.d0;
