@@ -164,10 +164,7 @@ jobs:
 
 # Begin job "build-win"
   build-win:
-    # windows-2022 also works and produces nearly identical binaries, so let's
-    # target the image that will be supported in the longer term. windows-2025
-    # is in beta as of June 2025, but testing has shown it is reliable.
-    runs-on: windows-2025
+    runs-on: ${{ matrix.sys.os }}
 
     strategy:
       # If set to true, all jobs within the same matrix (such as Linux or
@@ -178,27 +175,27 @@ jobs:
         # Available CUDA versions can be viewed at the Jimver/cuda-toolkit action sources:
         # https://github.com/Jimver/cuda-toolkit/blob/v0.2.24/src/links/windows-links.ts
         sys:
-          - { cuda_version: '12.9.0' }
-          - { cuda_version: '12.8.1' }
-          - { cuda_version: '12.6.3' }
-          - { cuda_version: '12.5.1' }
-          - { cuda_version: '12.4.1' }
-          - { cuda_version: '12.3.2' }
-          - { cuda_version: '12.2.2' }
-          - { cuda_version: '12.1.1' }
-          - { cuda_version: '12.0.1' }
-          - { cuda_version: '11.8.0' }
-          - { cuda_version: '11.7.1' }
-          - { cuda_version: '11.6.2' }
-          - { cuda_version: '11.5.2' }
-          - { cuda_version: '11.4.4' }
-          - { cuda_version: '11.3.1' }
-          - { cuda_version: '11.2.2' }
-          - { cuda_version: '11.1.1' }
-          - { cuda_version: '11.0.1' }
-          - { cuda_version: '10.0.130' }
-          - { cuda_version: '9.2.148' }
-          - { cuda_version: '8.0.61' }
+          - { cuda_version: '12.9.0', os: 'windows-2025' }
+          - { cuda_version: '12.8.1', os: 'windows-2025' }
+          - { cuda_version: '12.6.3', os: 'windows-2025' }
+          - { cuda_version: '12.5.1', os: 'windows-2025' }
+          - { cuda_version: '12.4.1', os: 'windows-2025' }
+          - { cuda_version: '12.3.2', os: 'windows-2025' }
+          - { cuda_version: '12.2.2', os: 'windows-2025' }
+          - { cuda_version: '12.1.1', os: 'windows-2025' }
+          - { cuda_version: '12.0.1', os: 'windows-2025' }
+          - { cuda_version: '11.8.0', os: 'windows-2025' }
+          - { cuda_version: '11.7.1', os: 'windows-2025' }
+          - { cuda_version: '11.6.2', os: 'windows-2025' }
+          - { cuda_version: '11.5.2', os: 'windows-2025' }
+          - { cuda_version: '11.4.4', os: 'windows-2025' }
+          - { cuda_version: '11.3.1', os: 'windows-2025' }
+          - { cuda_version: '11.2.2', os: 'windows-2025' }
+          - { cuda_version: '11.1.1', os: 'windows-2025' }
+          - { cuda_version: '11.0.1', os: 'windows-2025' }
+          - { cuda_version: '10.0.130', os: 'windows-2022' }
+          - { cuda_version: '9.2.148', os: 'windows-2022' }
+          - { cuda_version: '8.0.61', os: 'windows-2022' }
 
     env:
       MSVC_PKG_VC140: Microsoft.VisualStudio.Component.VC.140
