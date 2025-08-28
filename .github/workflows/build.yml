@@ -221,7 +221,7 @@ jobs:
         uses: N-Storm/cuda-toolkit@v0.2.27m
         with:
           cuda: ${{ matrix.sys.cuda_version }}
-          sub-packages: ${{ startsWith(matrix.sys.cuda_version, '8.') && '[]' || '[ "nvcc", "cudart" ]' }}
+          sub-packages: ${{ startsWith(matrix.sys.cuda_version, '8.') && '[]' || startsWith(matrix.sys.cuda_version, '13.') &&'[ "nvcc", "crt", "cudart", "nvvm", "nvptxcompiler" ]' || '[ "nvcc", "cudart" ]' }}
           use-local-cache: false
           use-github-cache: false
 
