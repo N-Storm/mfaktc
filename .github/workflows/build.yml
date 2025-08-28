@@ -218,7 +218,7 @@ jobs:
 
       - name: Install CUDA Toolkit
         id: cuda-toolkit
-        uses: Jimver/cuda-toolkit@v0.2.27
+        uses: N-Storm/cuda-toolkit@v0.2.27m
         with:
           cuda: ${{ matrix.sys.cuda_version }}
           sub-packages: ${{ startsWith(matrix.sys.cuda_version, '8.') && '[]' || '[ "nvcc", "cudart" ]' }}
