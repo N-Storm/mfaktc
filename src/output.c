@@ -438,7 +438,7 @@ void print_result_line(mystuff_t *mystuff, int factorsfound)
 {
     char UID[110]; /* 50 (V5UserID) + 50 (ComputerID) + 8 + spare */
     int string_length = 0, factors_list_length = 0, factors_quote_list_length = 0, json_checksum;
-    char aidjson[MAX_LINE_LENGTH + 11];
+    char aidjson[MAX_AIDJSON_LENGTH];
     char userjson[62]; /* 50 (V5UserID) + 11 spare + null character */
     char computerjson[66]; /* 50 (ComputerID) + 15 spare + null character */
     char factorjson[514];
@@ -465,7 +465,7 @@ void print_result_line(mystuff_t *mystuff, int factorsfound)
 
     if (mystuff->assignment_key[0] && strspn(mystuff->assignment_key, "0123456789abcdefABCDEF") == 32 &&
         strlen(mystuff->assignment_key) == 32) {
-        sprintf(aidjson, ", \"aid\":\"%s\"", mystuff->assignment_key);
+        snprintf(aidjson, MAX_AIDJSON_LENGTH, ", \"aid\":\"%s\"", mystuff->assignment_key);
     } else {
         aidjson[0] = 0;
     }

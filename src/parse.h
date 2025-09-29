@@ -12,7 +12,7 @@ mfaktc is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
-                                
+
 You should have received a copy of the GNU General Public License
 along with mfaktc.  If not, see <http://www.gnu.org/licenses/>.
 */
@@ -39,8 +39,8 @@ struct ASSIGNMENT {
     unsigned int exponent;
     int bit_min;
     int bit_max;
-    char assignment_key[MAX_LINE_LENGTH + 1]; // optional assignment key....
-    char comment[MAX_LINE_LENGTH + 1]; // optional comment.
+    LINE_BUFFER assignment_key; // optional assignment key....
+    LINE_BUFFER comment; // optional comment.
     // if it has a newline at the end, it was on a line by itself preceding the assignment.
     // otherwise, it followed the assignment on the same line.
 };

@@ -140,7 +140,8 @@ output
   endptr: the end of data
 */
 {
-    char line[MAX_LINE_LENGTH + 1], *ptr, *ptr_start, *ptr_end;
+    LINE_BUFFER line;
+    char *ptr, *ptr_start, *ptr_end;
     int c; // extended char pulled from stream;
 
     unsigned int scanpos;
@@ -155,7 +156,7 @@ output
     }
     // maybe it wasn't needed....
     if (linecopy != NULL) {
-        strcpy(*linecopy, line); // this is what was read...
+        strncpy(*linecopy, line, MAX_LINE_LENGTH + 1); // this is what was read...
     }
     if (strlen(line) == MAX_LINE_LENGTH && !feof(f_in) && line[strlen(line) - 1] != '\n') // long lines disallowed
     {
@@ -258,7 +259,7 @@ output
         *strstr(ptr, "\n") = '\0';
     }
     if (*ptr != '\0') {
-        strcpy(assignment->comment, ptr);
+        strncpy(assignment->comment, ptr, MAX_LINE_LENGTH + 1);
     }
 
     if (linecopy != NULL) {
@@ -350,7 +351,7 @@ enum ASSIGNMENT_ERRORS get_next_assignment(char *filename, unsigned int *exponen
         *bit_min  = assignment.bit_min;
         *bit_max  = assignment.bit_max;
 
-        if (key != NULL) strcpy(*key, assignment.assignment_key);
+        if (key != NULL) strncpy(*key, assignment.assignment_key, MAX_LINE_LENGTH + 1);
 
         return OK;
     } else
